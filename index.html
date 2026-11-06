@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shahriyar Exam Portal</title>
+<style>
+:root{--navy:#14264d;--blue:#2563eb;--bg:#f3f6fb;--ink:#172033;--muted:#64748b;--line:#e2e8f0}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--navy);color:white;padding:18px 5%;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-size:19px;font-weight:800}.sub{font-size:12px;color:#cbd5e1;margin-top:4px}
+main{max-width:1000px;margin:26px auto;padding:0 14px}.card{background:white;border:1px solid var(--line);border-radius:15px;padding:20px;margin-bottom:16px;box-shadow:0 5px 18px #1720330a}
+h1,h2,h3{margin:0 0 14px}h1{font-size:25px}h2{font-size:20px}p{color:var(--muted);line-height:1.5}
+input,textarea,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;font-size:15px;margin:6px 0 12px;background:white}
+textarea{min-height:110px;font-family:monospace}label{font-weight:700;font-size:13px}
+button{border:0;border-radius:9px;background:var(--blue);color:white;padding:12px 16px;font-weight:700;font-size:14px;cursor:pointer;margin:4px 4px 4px 0}
+button.secondary{background:#e8eefb;color:#18356e}button.danger{background:#b91c1c}.hidden{display:none!important}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.muted{color:var(--muted);font-size:13px}.pill{display:inline-block;background:#eaf1ff;color:#1d4ed8;padding:5px 9px;border-radius:30px;font-size:12px;font-weight:700}
+.item{border:1px solid var(--line);padding:14px;border-radius:11px;margin:10px 0}.question{padding:14px;border:1px solid var(--line);border-radius:12px;margin:12px 0}.option{display:block;padding:9px;margin:7px 0;background:#f8fafc;border-radius:8px;font-weight:400}
+.topline{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.timer{font-size:19px;font-weight:800;color:#b91c1c}
+.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:12px;border-radius:10px;font-size:13px;line-height:1.5}
+.success{color:#15803d}.error{color:#b91c1c}footer{text-align:center;color:#94a3b8;padding:25px;font-size:12px}
+</style>
+</head>
+<body>
+<header><div><div class="brand">🎓 Shahriyar Exam Portal</div><div class="sub">Professional Online Examination System</div></div><div id="userbar" class="hidden"><span id="who"></span> <button class="secondary" onclick="logout()">Logout</button></div></header>
+<main>
+<section id="login" class="card">
+<h1>Welcome Back</h1><p>Login to continue to your examination portal.</p>
+<label>Email address</label><input id="email" type="email" placeholder="Enter your email">
+<label>Password</label><input id="password" type="password" placeholder="Enter your password">
+<button onclick="login()">Login</button><div id="loginmsg" class="muted"></div>
+<p class="muted">Student accounts are created by the administrator.</p>
+</section>
+
+<section id="admin" class="hidden">
+<div class="topline"><h1>Admin Dashboard</h1><span class="pill">ADMIN</span></div>
+<div class="grid">
+<div class="card"><h2>Create Student</h2>
+<label>Student name</label><input id="sname" placeholder="Student full name">
+<label>Student ID</label><input id="sid" placeholder="e.g. 1001">
+<label>Student email</label><input id="semail" type="email" placeholder="student@example.com">
+<label>Temporary password</label><input id="spass" type="text" placeholder="At least 6 characters">
+<button onclick="createStudent()">Create student account</button><div id="studentmsg" class="muted"></div>
+</div>
+<div class="card"><h2>Create Examination</h2>
+<label>Exam title</label><input id="etitle" placeholder="Physics Model Test 01">
+<label>Subject</label><input id="esubject" placeholder="Physics">
+<label>Duration (minutes)</label><input id="eduration" type="number" min="1" value="30">
+<label>Questions (JSON format)</label>
+<textarea id="eqjson">[
+  {"question":"What is the SI unit of force?","options":["Joule","Newton","Watt","Pascal"],"answer":1}
+]</textarea>
+<p class="muted">Each question needs question, options (4 choices), and answer (0–3). Example answer 1 means the second option.</p>
+<button onclick="createExam()">Save exam as draft</button><div id="exammsg" class="muted"></div>
+</div>
+</div>
+<div class="card"><h2>Manage Examinations</h2><div id="adminexams">Loading...</div></div>
+<div class="card"><h2>Student Results</h2><div id="adminresults">Loading...</div></div>
+</section>
+
+<section id="student" class="hidden">
+<div class="topline"><h1>Student Dashboard</h1><span class="pill">STUDENT</span></div>
+<div class="card"><h2>Available Examinations</h2><div id="studentexams">Loading...</div></div>
+<div class="card"><h2>My Results</h2><div id="myresults">Loading...</div></div>
+</section>
+
+<section id="examview" class="hidden card">
+<div class="topline"><h2 id="examtitle">Examination</h2><div class="timer" id="timer">--:--</div></div>
+<div class="notice">Do not refresh or close the page during an examination. Your answers are submitted when you press Submit Exam or when the timer ends.</div>
+<div id="examquestions"></div><button onclick="submitExam()">Submit Exam</button><div id="examfeedback"></div>
+</section>
+</main>
+<footer>Shahriyar Exam Portal • Powered by Firebase</footer>
+<script type="module">
+import {initializeApp, getApps, getApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import {getFirestore, collection, addDoc, getDocs, doc, setDoc, getDoc, query, where, orderBy, serverTimestamp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+/* 1) Paste your own Firebase config values below. */
+const firebaseConfig = {
+  apiKey: "PASTE_API_KEY",
+  authDomain: "PASTE_AUTH_DOMAIN",
+  projectId: "PASTE_PROJECT_ID",
+  storageBucket: "PASTE_STORAGE_BUCKET",
+  messagingSenderId: "PASTE_MESSAGING_SENDER_ID",
+  appId: "PASTE_APP_ID"
+};
+/* 2) After creating your admin account, paste its Firebase Authentication UID here. */
+const ADMIN_UID = "PASTE_ADMIN_UID";
+
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app), db=getFirestore(app);
+let currentUser=null, activeExam=null, timerHandle=null, secondsLeft=0, studentAnswers={};
+
+const $=id=>document.getElementById(id);
+function show(id){["login","admin","student","examview"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}
+function msg(id,t,cls="muted"){$(id).className=cls;$(id).textContent=t}
+window.login=async()=>{try{const c=await signInWithEmailAndPassword(auth,$("email").value.trim(),$("password").value);currentUser=c.user;await routeUser()}catch(e){msg("loginmsg",friendly(e),"error")}};
+window.logout=async()=>{await signOut(auth);currentUser=null;show("login");$("userbar").classList.add("hidden")};
+function friendly(e){return e.code==="auth/invalid-credential"?"Email or password is incorrect.":e.message}
+async function routeUser(){
+ $("userbar").classList.remove("hidden");$("who").textContent=currentUser.email||"Logged in";
+ if(currentUser.uid===ADMIN_UID){show("admin");await loadAdmin()}else{show("student");await loadStudent()}
+}
+async function loadAdmin(){await loadAdminExams();await loadAdminResults()}
+async function createStudent(){
+ const name=$("sname").value.trim(), sid=$("sid").value.trim(), email=$("semail").value.trim(), pass=$("spass").value;
+ if(!name||!sid||!email||pass.length<6){msg("studentmsg","Fill every field. Password must be at least 6 characters.","error");return}
+ try{
+  const secondaryName="secondary";
+  const secondaryApp=getApps().find(a=>a.name===secondaryName)||initializeApp(firebaseConfig,secondaryName);
+  const secondaryAuth=getAuth(secondaryApp);
+  const cred=await createUserWithEmailAndPassword(secondaryAuth,email,pass);
+  await setDoc(doc(db,"students",cred.user.uid),{name,studentId:sid,email,role:"student",createdAt:serverTimestamp()});
+  await signOut(secondaryAuth);
+  msg("studentmsg","Student account created successfully. Share the email and temporary password securely.","success");
+  ["sname","sid","semail","spass"].forEach(x=>$(x).value="");
+ }catch(e){msg("studentmsg",friendly(e),"error")}
+}
+window.createStudent=createStudent;
+window.createExam=async()=>{
+ try{
+  const title=$("etitle").value.trim(), subject=$("esubject").value.trim(), duration=Number($("eduration").value), questions=JSON.parse($("eqjson").value);
+  if(!title||!subject||!duration||!Array.isArray(questions)||!questions.length)throw new Error("Enter title, subject, duration and valid questions JSON.");
+  for(const q of questions){if(!q.question||!Array.isArray(q.options)||q.options.length!==4||![0,1,2,3].includes(Number(q.answer)))throw new Error("Each question needs text, 4 options and answer 0, 1, 2 or 3.")}
+  await addDoc(collection(db,"exams"),{title,subject,duration,questions,status:"draft",createdBy:currentUser.uid,createdAt:serverTimestamp()});
+  msg("exammsg","Exam saved as draft. Publish it from Manage Examinations.","success");await loadAdminExams();
+ }catch(e){msg("exammsg",e.message,"error")}
+};
+async function loadAdminExams(){
+ const snap=await getDocs(collection(db,"exams"));const el=$("adminexams");el.innerHTML="";
+ if(snap.empty){el.textContent="No examinations created yet.";return}
+ snap.forEach(d=>{const x=d.data(),div=document.createElement("div");div.className="item";div.innerHTML=`<b>${esc(x.title)}</b> • ${esc(x.subject)} • ${x.duration} min <span class="pill">${esc(x.status)}</span><br><span class="muted">${(x.questions||[]).length} questions</span><br>`;
+ const b=document.createElement("button");b.textContent=x.status==="published"?"Unpublish":"Publish";b.onclick=async()=>{await setDoc(doc(db,"exams",d.id),{status:x.status==="published"?"draft":"published"},{merge:true});await loadAdminExams()};div.appendChild(b);el.appendChild(div)})
+}
+async function loadAdminResults(){
+ const snap=await getDocs(collection(db,"results"));const el=$("adminresults");el.innerHTML="";
+ if(snap.empty){el.textContent="No results yet.";return}
+ snap.forEach(d=>{const r=d.data(),div=document.createElement("div");div.className="item";div.textContent=`${r.studentEmail} • ${r.examTitle} • ${r.score}/${r.total} (${r.percentage}%)`;el.appendChild(div)})
+}
+async function loadStudent(){
+ const [exams,results]=await Promise.all([getDocs(query(collection(db,"exams"),where("status","==","published"))),getDocs(query(collection(db,"results"),where("studentUid","==",currentUser.uid)))]);
+ const e=$("studentexams");e.innerHTML="";
+ if(exams.empty)e.textContent="No published examinations yet.";
+ exams.forEach(d=>{const x=d.data(),div=document.createElement("div");div.className="item";div.innerHTML=`<b>${esc(x.title)}</b> • ${esc(x.subject)}<br><span class="muted">${x.duration} minutes • ${(x.questions||[]).length} questions</span><br>`;
+ const b=document.createElement("button");b.textContent="Start Exam";b.onclick=()=>startExam(d.id,x);div.appendChild(b);e.appendChild(div)});
+ const r=$("myresults");r.innerHTML="";if(results.empty)r.textContent="You have no results yet.";
+ results.forEach(d=>{const x=d.data(),div=document.createElement("div");div.className="item";div.textContent=`${x.examTitle}: ${x.score}/${x.total} (${x.percentage}%)`;r.appendChild(div)})
+}
+function startExam(id,x){
+ activeExam={id,...x};studentAnswers={};$("examtitle").textContent=x.title;$("examfeedback").textContent="";
+ const wrap=$("examquestions");wrap.innerHTML="";
+ x.questions.forEach((q,i)=>{const box=document.createElement("div");box.className="question";const h=document.createElement("b");h.textContent=`${i+1}. ${q.question}`;box.appendChild(h);
+ q.options.forEach((o,j)=>{const lab=document.createElement("label");lab.className="option";const inp=document.createElement("input");inp.type="radio";inp.name="q"+i;inp.value=j;inp.style.width="auto";inp.style.marginRight="8px";inp.onchange=()=>studentAnswers[i]=j;lab.append(inp,document.createTextNode(o));box.appendChild(lab)});wrap.appendChild(box)});
+ secondsLeft=x.duration*60;updateTimer();if(timerHandle)clearInterval(timerHandle);timerHandle=setInterval(()=>{secondsLeft--;updateTimer();if(secondsLeft<=0)submitExam()},1000);show("examview")
+}
+function updateTimer(){$("timer").textContent=`${Math.floor(secondsLeft/60)}:${String(secondsLeft%60).padStart(2,"0")}`}
+window.submitExam=async()=>{
+ if(!activeExam)return;if(timerHandle)clearInterval(timerHandle);
+ const total=activeExam.questions.length;let score=0;activeExam.questions.forEach((q,i)=>{if(Number(studentAnswers[i])===Number(q.answer))score++});
+ const percentage=Math.round(score/total*100);
+ try{await addDoc(collection(db,"results"),{studentUid:currentUser.uid,studentEmail:currentUser.email,examId:activeExam.id,examTitle:activeExam.title,score,total,percentage,submittedAt:serverTimestamp()});
+ $("examfeedback").innerHTML=`<h3 class="success">Submitted! Your score: ${score}/${total} (${percentage}%)</h3>`;activeExam=null;await loadStudent()
+ }catch(e){$("examfeedback").textContent="Could not save result: "+e.message}
+};
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+auth.onAuthStateChanged?.(u=>{if(u){currentUser=u;routeUser()}});
+</script>
+</body></html>
